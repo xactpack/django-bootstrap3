@@ -48,6 +48,7 @@ class BaseRenderer(object):
             get_bootstrap_setting('horizontal_field_class')
         )
 
+
     def parse_size(self, size):
         size = text_value(size).lower().strip()
         if size in ('sm', 'small'):
@@ -272,6 +273,8 @@ class FieldRenderer(BaseRenderer):
             self.required_css_class = ''
 
         self.set_disabled = kwargs.get('set_disabled', False)
+        self.input_group_extra_classes = kwargs.get('input_group_extra_classes', self.widget.attrs.pop('input_group_extra_classes', ''))
+
 
     def restore_widget_attrs(self):
         self.widget.attrs = self.initial_attrs.copy()
@@ -408,11 +411,19 @@ class FieldRenderer(BaseRenderer):
                 addon=self.addon_before) if self.addon_before else ''
             after = '<span class="input-group-addon">{addon}</span>'.format(
                 addon=self.addon_after) if self.addon_after else ''
-            html = '<div class="input-group">{before}{html}{after}</div>'.format(
-                before=before,
-                after=after,
-                html=html
-            )
+            if self.input_group_extra_classes:
+                html = '<div class="input-group {extra_classes}">{before}{html}{after}</div>'.format(
+                    extra_classes=self.input_group_extra_classes,
+                    before=before,
+                    after=after,
+                    html=html
+                )
+            else:
+                html = '<div class="input-group">{before}{html}{after}</div>'.format(
+                    before=before,
+                    after=after,
+                    html=html
+                )
         return html
 
     def append_to_field(self, html):
