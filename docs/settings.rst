@@ -18,7 +18,7 @@ The ``BOOTSTRAP3`` dict variable contains these settings and defaults:
         'jquery_url': '//code.jquery.com/jquery.min.js',
 
         # The Bootstrap base URL
-        'base_url': '//maxcdn.bootstrapcdn.com/bootstrap/3.3.6/',
+        'base_url': '//maxcdn.bootstrapcdn.com/bootstrap/3.3.7/',
 
         # The complete URL to the Bootstrap CSS file (None means derive it from base_url)
         'css_url': None,
@@ -41,13 +41,14 @@ The ``BOOTSTRAP3`` dict variable contains these settings and defaults:
         # Field class to use in horizontal forms
         'horizontal_field_class': 'col-md-9',
 
-        # Set HTML required attribute on required fields
+        # Set HTML required attribute on required fields, for Django <= 1.8 only
         'set_required': True,
 
-        # Set HTML disabled attribute on disabled fields
+        # Set HTML disabled attribute on disabled fields, for Django <= 1.8 only
         'set_disabled': False,
 
-        # Set placeholder attributes to label if no placeholder is provided
+        # Set placeholder attributes to label if no placeholder is provided.
+        # This also considers the 'label' option of {% bootstrap_field %} tags.
         'set_placeholder': True,
 
         # Class to indicate required (better to set this in your Django form)

@@ -2,11 +2,23 @@
 from __future__ import unicode_literals
 
 import re
+from collections import Mapping
 
-from django.forms.widgets import flatatt
+try:
+    from urllib import urlencode
+except ImportError:
+    from urllib.parse import urlencode
+
+try:
+    from urlparse import urlparse, parse_qs, urlunparse
+except ImportError:
+    from urllib.parse import urlparse, parse_qs, urlunparse
+
+from django.forms.utils import flatatt
 from django.template import Variable, VariableDoesNotExist
 from django.template.base import FilterExpression, kwarg_re, TemplateSyntaxError
 from django.template.loader import get_template
+from django.utils.encoding import force_str, force_text
 from django.utils.safestring import mark_safe
 
 try:
@@ -134,6 +146,24 @@ def render_template_file(template, context=None):
     """
     Render a Template to unicode
     """
-    assert type(context) == type({})
+    assert isinstance(context, Mapping)
     template = get_template(template)
     return template.render(context)
+
+
+def url_replace_param(url, name, value):
+    """
+    Replace a GET parameter in an URL
+    """
+    url_components = urlparse(force_str(url))
+    query_params = parse_qs(url_components.query)
+    query_params[name] = value
+    query = urlencode(query_params, doseq=True)
+    return force_text(urlunparse([
+        url_components.scheme,
+        url_components.netloc,
+        url_components.path,
+        url_components.params,
+        query,
+        url_components.fragment,
+    ]))

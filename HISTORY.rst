@@ -3,6 +3,90 @@
 History
 -------
 
+
+9.1.0
++++++
+
+* Mention `django-bootstrap4 <https://github.com/zostera/django-bootstrap4/>`_ in README
+* Rewrite `tox` test matrix to focus on Django releases rather than Python versions
+* Add tests for Django master branch (>= 2)
+* Add `label` override for `{% bootstrap_field %}`
+
+
+9.0.0 (2017-07-11)
+++++++++++++++++++
+
+* Renamed requirements-dev.txt back to requirements.txt because that suits ReadTheDocs better
+* Added `error_types` support on bootstrap3_form (thanks @mkoistinen and @ickam)
+* **BREAKING** Default setting of `error_types` to `non_field_errors` is different fro behavior in versions < 9
+
+
+8.2.3 (2017-05-05)
+++++++++++++++++++
+
+* Renamed requirements.txt to requirements-dev.txt
+* Tweaks to tests and CI (see #400)
+* Prepared test for geometry fields (disabled, blocked by Django update, see #392)
+* Bug fixes for add ons and placeholders (thanks @jaimesanz, @cybojenix and @marc-gist)
+* Improve documentation for pagination with GET parameters (thanks @nspo)
+* Add unicode test for help_text
+* Removed tests for Python 3.2 from tox and Travis CI (no longer supported by Django 1.8)
+
+
+8.2.2 (2017-04-03)
+++++++++++++++++++
+
+* Fix invalid HTML in help texts (thanks @luksen)
+* Added `mark_safe` to placeholder (thanks @ppo)
+* Fix DateWidget import for newer Django versions (thanks @clokep)
+
+
+8.2.1 (2017-02-23)
+++++++++++++++++++
+
+* Support for local languages in `url_replace_param` on Python 2 (#362, thanks @aamalev)
+* Correct checking Mapping instance (#363, thanks @aamalev)
+* Fix Django 1.11 import bug (see #369)
+* Add Django 1.11 and Python 3.6 to tests
+* Fix sdist issue with .pyc files
+
+
+8.1.0 (2017-01-12)
+++++++++++++++++++
+
+* Rolled back subresource integrity (see #353)
+* Documentation fix (thanks @clokep)
+
+
+8.0.0 (2017-01-06)
+++++++++++++++++++
+
+* **BREAKING** For Django >= 1.10 Remove everything to do with setting HTML attributes `required` (#337) and `disabled` (#345)
+* Add `id` parameter to bootstrap_button (#214)
+* Add `set_placeholder` to field and form renderers (#339, thanks @predatell)
+* Default button type to `btn-default`
+* Add `addon_before_class` and `addon_after_class` (#295, thanks @DanWright91 and others)
+* Fix handling of error class (#170)
+* No size class for checkboxes (#318, thanks @cybojenix)
+* Fix warnings during install (thanks @mfcovington)
+* Fix rare RunTimeError when working without database (#346, thanks @Mactory)
+* Add subresource integrity to external components (thanks @mfcovington and @Alex131089)
+* Several improvements to documentation, tests, and comments. Thanks all!
+
+
+7.1.0 (2016-09-16)
+++++++++++++++++++
+
+* Print help text and errors in their own block (#329, thanks @Matoking)
+* Improved page urls in pagination (fixes #323)
+* Changed setup.py to allow `setup.py test` run tests
+* Removed link target from active page in pagination (fixes #328)
+* Fixed example for bootstrap_label (fixed #332)
+* Fixed tests to support Django 1.10 handling of required attribute, see #337 (needs fixing)
+* Added tests for Django 1.10
+* Bootstrap to 3.3.7
+
+
 7.0.1 (2016-03-23)
 ++++++++++++++++++
 

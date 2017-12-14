@@ -5,8 +5,8 @@ import re
 from math import floor
 
 from django import template
-from django.contrib.messages import constants as message_constants
 from django.contrib.messages import constants as DEFAULT_MESSAGE_LEVELS
+from django.contrib.messages import constants as message_constants
 from django.template import Context
 from django.utils.safestring import mark_safe
 
@@ -20,7 +20,7 @@ from ..forms import (
     render_label, render_form_errors, render_formset_errors
 )
 from ..text import force_text
-from ..utils import handle_var, parse_token_contents
+from ..utils import handle_var, parse_token_contents, url_replace_param
 from ..utils import render_link_tag, render_tag, render_template_file
 
 MESSAGE_LEVEL_CLASSES = {
@@ -189,8 +189,10 @@ def bootstrap_css():
 
         {% bootstrap_css %}
     """
-    urls = [url for url in [bootstrap_css_url(), bootstrap_theme_url()] if url]
-    return mark_safe(''.join([render_link_tag(url) for url in urls]))
+    rendered_urls = [render_link_tag(bootstrap_css_url()), ]
+    if bootstrap_theme_url():
+        rendered_urls.append(render_link_tag(bootstrap_theme_url()))
+    return mark_safe(''.join([url for url in rendered_urls]))
 
 
 @register.simple_tag
@@ -234,7 +236,8 @@ def bootstrap_javascript(jquery=None):
             javascript += render_tag('script', attrs={'src': url})
     url = bootstrap_javascript_url()
     if url:
-        javascript += render_tag('script', attrs={'src': url})
+        attrs = {'src': url}
+        javascript += render_tag('script', attrs=attrs)
     return mark_safe(javascript)
 
 
@@ -283,7 +286,8 @@ def bootstrap_formset_errors(*args, **kwargs):
             The formset that is being rendered
 
         layout
-            Context value that is available in the template ``bootstrap3/form_errors.html`` as ``layout``.
+            Context value that is available in the template ``bootstrap3/form_errors.html``
+            as ``layout``.
 
     **Usage**::
 
@@ -310,6 +314,16 @@ def bootstrap_form(*args, **kwargs):
         form
             The form that is to be rendered
 
+        exclude
+            A list of field names (comma separated) that should not be rendered
+            E.g. exclude=subject,bcc
+
+        error_types
+            This controls the types of errors that are rendered above the form.
+            Choices are: "all", "field_errors", "non_field_errors" or "none". This will not
+            affect the display of errors on the fields themselves.
+
+            Default is "non_field_errors".
 
         See bootstrap_field_ for other arguments
 
@@ -338,16 +352,16 @@ def bootstrap_form_errors(*args, **kwargs):
         form
             The form that is to be rendered
 
-        type
+        error_types
             Control which type of errors should be rendered.
 
             One of the following values:
 
                 * ``'all'``
-                * ``'fields'``
-                * ``'non_fields'``
+                * ``'field_errors'``
+                * ``'non_field_errors'``
 
-            :default: ``'all'``
+            :default: ``'non_field_errors'``
 
         layout
             Context value that is available in the template ``bootstrap3/form_errors.html`` as ``layout``.
@@ -408,12 +422,14 @@ def bootstrap_field(*args, **kwargs):
 
         set_required
             When set to ``True`` and the field is required then the ``required`` attribute is set on the
-            rendered field
+            rendered field. This only works up to Django 1.8. Higher Django versions handle ``required``
+            natively.
 
             :default: ``True``
 
         set_disabled
-            When set to ``True`` then the ``disabled`` attribute is set on the rendered field.
+            When set to ``True`` then the ``disabled`` attribute is set on the rendered field. This only
+            works up to Django 1.8.  Higher Django versions handle ``disabled`` natively.
 
             :default: ``False``
 
@@ -426,6 +442,11 @@ def bootstrap_field(*args, **kwargs):
                 * ``'medium'``
                 * ``'large'``
 
+        placeholder
+            Set/overwrite the field's placeholder.
+
+        label
+            Overwrite the field's label.
 
         horizontal_label_class
             Class used on the label when the ``layout`` is set to ``horizontal``.
@@ -438,12 +459,36 @@ def bootstrap_field(*args, **kwargs):
             :default: ``'col-md-9'``. Can be changed in :doc:`settings`
 
         addon_before
-            Text that should be prepended to the form field. See the `Bootstrap docs <http://getbootstrap.com/components/#input-groups-basic>`_
-            for an example.
+            Text that should be prepended to the form field. Can also be an icon, e.g.
+            ``'<span class="glyphicon glyphicon-calendar"></span>'``
+
+            See the `Bootstrap docs <http://getbootstrap.com/components/#input-groups-basic>` for more examples.
 
         addon_after
-            Text that should be appended to the form field. See the `Bootstrap docs <http://getbootstrap.com/components/#input-groups-basic>`_
-            for an example.
+            Text that should be appended to the form field. Can also be an icon, e.g.
+            ``'<span class="glyphicon glyphicon-calendar"></span>'``
+
+            See the `Bootstrap docs <http://getbootstrap.com/components/#input-groups-basic>` for more examples.
+
+        addon_before_class
+            Class used on the span when ``addon_before`` is used.
+
+            One of the following values:
+
+                * ``'input-group-addon'``
+                * ``'input-group-btn'``
+
+            :default: ``input-group-addon``
+
+        addon_after_class
+            Class used on the span when ``addon_after`` is used.
+
+            One of the following values:
+
+                * ``'input-group-addon'``
+                * ``'input-group-btn'``
+
+            :default: ``input-group-addon``
 
         error_css_class
             CSS class used when the field has an error
@@ -500,7 +545,7 @@ def bootstrap_label(*args, **kwargs):
 
     **Example**::
 
-        {% bootstrap_label "Email address" for="exampleInputEmail1" %}
+        {% bootstrap_label "Email address" label_for="exampleInputEmail1" %}
 
     """
     return render_label(*args, **kwargs)
@@ -533,6 +578,9 @@ def bootstrap_button(*args, **kwargs):
             Name of an icon to render in the button's visible content. See bootstrap_icon_ for acceptable values.
 
         button_class
+            The class of button to use. If none is given, btn-default will be used.
+
+        extra_classes
             Any extra CSS classes that should be added to the button.
 
         size
@@ -583,6 +631,12 @@ def bootstrap_icon(icon, **kwargs):
         icon
             Icon name. See the `Bootstrap docs <http://getbootstrap.com/components/#glyphicons>`_ for all icons.
 
+        extra_classes
+            Extra CSS classes to add to the icon HTML
+
+        title
+            A title for the icon (HTML title attrivute)
+
     **Usage**::
 
         {% bootstrap_icon icon %}
@@ -628,7 +682,7 @@ def bootstrap_alert(content, alert_type='info', dismissable=True):
 
     **Example**::
 
-        {% bootstrap_alert "Something went wrong" alert_type='error' %}
+        {% bootstrap_alert "Something went wrong" alert_type='danger' %}
 
     """
     return render_alert(content, alert_type, dismissable)
@@ -760,7 +814,8 @@ def bootstrap_pagination(page, **kwargs):
             :default: ``None``
 
         size
-            Controls the size of the pagination through CSS. Defaults to being normal sized.
+            Controls the size of the pagination through CSS.
+            Defaults to being normal sized.
 
             One of the following:
 
@@ -786,12 +841,18 @@ def bootstrap_pagination(page, **kwargs):
     **Example**::
 
         {% bootstrap_pagination lines url="/pagination?page=1" size="large" %}
+        {% bootstrap_pagination page_obj extra=request.GET.urlencode %}
 
     """
 
     pagination_kwargs = kwargs.copy()
     pagination_kwargs['page'] = page
     return get_pagination_context(**pagination_kwargs)
+
+
+@register.simple_tag
+def bootstrap_url_replace_param(url, name, value):
+    return url_replace_param(url, name, value)
 
 
 def get_pagination_context(page, pages_to_show=11,

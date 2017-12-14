@@ -22,7 +22,10 @@ INSTALLED_APPS = (
     'bootstrap3',
 )
 
-MIDDLEWARE_CLASSES = DEFAULT_SETTINGS.MIDDLEWARE_CLASSES
+try:
+    MIDDLEWARE_CLASSES = DEFAULT_SETTINGS.MIDDLEWARE_CLASSES
+except AttributeError:
+    pass
 
 TEMPLATES = [{
     'BACKEND': 'django.template.backends.django.DjangoTemplates',
@@ -42,7 +45,10 @@ TEMPLATES = [{
 
 ROOT_URLCONF = None
 
+STATIC_URL = '/static/'
+
 BOOTSTRAP3 = {
+    'theme_url': '//example.com/theme.css',
     'javascript_in_head': True,
     'required_css_class': 'bootstrap3-req',
     'error_css_class': 'bootstrap3-err',

@@ -4,22 +4,29 @@ from __future__ import unicode_literals
 from django.contrib.admin.widgets import AdminFileWidget
 from django.forms import (
     HiddenInput, FileInput, CheckboxSelectMultiple, Textarea, TextInput,
-    PasswordInput
+    PasswordInput, NumberInput, EmailInput, URLInput,
 )
 from django.forms.widgets import CheckboxInput
 from django.utils.safestring import mark_safe
 
 from .bootstrap import (
     get_bootstrap_setting, get_form_renderer, get_field_renderer,
-    get_formset_renderer
-)
-from .text import text_concat, text_value
-from .exceptions import BootstrapError
-from .utils import add_css_class, render_tag, split_css_classes
+    get_formset_renderer,
+    DBS3_SET_REQUIRED_SET_DISABLED)
 from .components import render_icon
-
+from .exceptions import BootstrapError
+from .text import text_concat, text_value
+from .utils import add_css_class, render_tag
 
 FORM_GROUP_CLASS = 'form-group'
+
+WIDGETS_NO_REQUIRED = (
+    AdminFileWidget,
+    HiddenInput,
+    FileInput,
+    CheckboxInput,
+    CheckboxSelectMultiple
+)
 
 
 def render_formset(formset, **kwargs):
@@ -46,12 +53,12 @@ def render_form(form, **kwargs):
     return renderer_cls(form, **kwargs).render()
 
 
-def render_form_errors(form, type='all', **kwargs):
+def render_form_errors(form, error_types='non_field_errors', **kwargs):
     """
     Render form errors to a Bootstrap layout
     """
     renderer_cls = get_form_renderer(**kwargs)
-    return renderer_cls(form, **kwargs).render_errors(type)
+    return renderer_cls(form, **kwargs).render_errors(error_types)
 
 
 def render_field(field, **kwargs):
@@ -77,8 +84,8 @@ def render_label(content, label_for=None, label_class=None, label_title=''):
 
 
 def render_button(
-        content, button_type=None, icon=None, button_class='', size='',
-        href='', name=None, value=None, title=None):
+        content, button_type=None, icon=None, button_class='btn-default', size='',
+        href='', name=None, value=None, title=None, extra_classes='', id=''):
     """
     Render a button with content
     """
@@ -98,14 +105,12 @@ def render_button(
             'Parameter "size" should be "xs", "sm", "lg" or ' +
             'empty ("{}" given).'.format(size))
     if button_type:
-        if button_type == 'submit':
-            if not any([c.startswith('btn-') for c in split_css_classes(classes)]):
-                classes = add_css_class(classes, 'btn-primary')
-        elif button_type not in ('reset', 'button', 'link'):
+        if button_type not in ('submit', 'reset', 'button', 'link'):
             raise BootstrapError(
                 'Parameter "button_type" should be "submit", "reset", ' +
                 '"button", "link" or empty  ("{}" given).'.format(button_type))
         attrs['type'] = button_type
+    classes = add_css_class(classes, extra_classes)
     attrs['class'] = classes
     icon_content = render_icon(icon) if icon else ''
     if href:
@@ -113,6 +118,8 @@ def render_button(
         tag = 'a'
     else:
         tag = 'button'
+    if id:
+        attrs['id'] = id
     if name:
         attrs['name'] = name
     if value:
@@ -164,14 +171,11 @@ def is_widget_required_attribute(widget):
     """
     Is this widget required?
     """
-    if not get_bootstrap_setting('set_required'):
+    if DBS3_SET_REQUIRED_SET_DISABLED and not get_bootstrap_setting('set_required'):
         return False
     if not widget.is_required:
         return False
-    if isinstance(
-            widget, (
-                AdminFileWidget, HiddenInput, FileInput,
-                CheckboxInput, CheckboxSelectMultiple)):
+    if isinstance(widget, WIDGETS_NO_REQUIRED):
         return False
     return True
 
@@ -180,8 +184,6 @@ def is_widget_with_placeholder(widget):
     """
     Is this a widget that should have a placeholder?
     Only text, search, url, tel, e-mail, password, number have placeholders
-    These are all derived form TextInput, except for Textarea
     """
-    # PasswordInput inherits from Input in Django 1.4.
-    # It was changed to inherit from TextInput in 1.5.
-    return isinstance(widget, (TextInput, Textarea, PasswordInput))
+    return isinstance(widget, (TextInput, Textarea, NumberInput, EmailInput,
+                               URLInput, PasswordInput))

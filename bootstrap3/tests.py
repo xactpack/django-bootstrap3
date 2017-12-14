@@ -8,8 +8,9 @@ from django.contrib.admin.widgets import AdminSplitDateTime
 from django.contrib.messages import constants as DEFAULT_MESSAGE_LEVELS
 from django.forms.formsets import formset_factory
 from django.template import engines
-from django.test import TestCase
+from django.test import TestCase, override_settings
 
+from .bootstrap import DBS3_SET_REQUIRED_SET_DISABLED
 from .exceptions import BootstrapError
 from .text import text_value, text_concat
 from .utils import add_css_class, render_tag
@@ -28,15 +29,31 @@ MEDIA_CHOICES = (
     ('Audio', (
         ('vinyl', 'Vinyl'),
         ('cd', 'CD'),
-    )
-     ),
+    )),
     ('Video', (
         ('vhs', 'VHS Tape'),
         ('dvd', 'DVD'),
-    )
-     ),
+    )),
     ('unknown', 'Unknown'),
 )
+
+
+class SmallTestForm(forms.Form):
+    sender = forms.EmailField(
+        label='Sender © unicode',
+        help_text='E.g., "me@example.com"')
+    subject = forms.CharField(
+        max_length=100,
+        help_text='my_help_text',
+        required=True,
+        widget=forms.TextInput(attrs={'placeholder': 'placeholdertest'}),
+    )
+
+    def clean(self):
+        cleaned_data = super(SmallTestForm, self).clean()
+        raise forms.ValidationError(
+            "This error was added to show the non field errors styling.")
+        return cleaned_data
 
 
 class TestForm(forms.Form):
@@ -57,6 +74,7 @@ class TestForm(forms.Form):
         label='Sender © unicode',
         help_text='E.g., "me@example.com"')
     secret = forms.CharField(initial=42, widget=forms.HiddenInput)
+    weird = forms.CharField(help_text=u"strings are now utf-8 \u03BCnico\u0394é!")
     cc_myself = forms.BooleanField(
         required=False,
         help_text='cc stands for "carbon copy." You will get a copy in your mailbox.'
@@ -85,11 +103,20 @@ class TestForm(forms.Form):
         widget=forms.CheckboxSelectMultiple,
         help_text='Check as many as you like.',
     )
+    number = forms.FloatField()
+    url = forms.URLField()
     addon = forms.CharField(
         widget=forms.TextInput(attrs={'addon_before': 'before', 'addon_after': 'after'}),
     )
 
+    # TODO: Re-enable this after Django 1.11 #28105 is available
+    # polygon = gisforms.PointField()
+
     required_css_class = 'bootstrap3-req'
+
+    # Set this to allow tests to work properly in Django 1.10+
+    # More information, see issue #337
+    use_required_attribute = False
 
     def clean(self):
         cleaned_data = super(TestForm, self).clean()
@@ -104,7 +131,7 @@ class TestFormWithoutRequiredClass(TestForm):
 
 def render_template(text, context=None):
     """
-    Create a template ``text`` that first loads bootstrap3.
+    Create a template ``text``
     """
     template = engines['django'].from_string(text)
     if not context:
@@ -197,15 +224,19 @@ class SettingsTest(TestCase):
         res = render_template_with_form('{% bootstrap_javascript %}')
         self.assertEqual(
             res.strip(),
-            '<script src="//maxcdn.bootstrapcdn.com/bootstrap/3.3.6/js/bootstrap.min.js"></script>'
+            '<script src="//maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js"></script>'
         )
 
     def test_bootstrap_css_tag(self):
-        res = render_template_with_form('{% bootstrap_css %}')
-        self.assertIn(res.strip(), [
-            '<link rel="stylesheet" href="//maxcdn.bootstrapcdn.com/bootstrap/3.3.6/css/bootstrap.min.css">',
-            '<link href="//maxcdn.bootstrapcdn.com/bootstrap/3.3.6/css/bootstrap.min.css" rel="stylesheet">',
-        ])
+        res = render_template_with_form('{% bootstrap_css %}').strip()
+        self.assertIn(
+            '<link href="//maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" rel="stylesheet">',
+            res
+        )
+        self.assertIn(
+            '<link href="//example.com/theme.css" rel="stylesheet">',
+            res
+        )
 
     def test_settings_filter(self):
         res = render_template_with_form('{{ "required_css_class"|bootstrap_setting }}')
@@ -362,6 +393,64 @@ class FormTest(TestCase):
         )
         self.assertNotIn('bootstrap3-bound', res)
 
+    def test_error_types(self):
+        form = SmallTestForm({'sender': 'sender'})
+
+        pattern = re.compile(r'\s')
+
+        res = render_template_with_form(
+            '{% bootstrap_form form error_types="all" %}',
+            {'form': form}
+        )
+        expected = """
+            <div class="alert alert-danger alert-dismissable alert-link">
+               <button class="close" type="button" data-dismiss="alert" aria-hidden="true">&#215;</button>
+               Enter a valid email address.<br>
+               This field is required.<br>
+               This error was added to show the non field errors styling.
+           </div>
+        """
+        self.assertIn(
+            re.sub(pattern, '', expected),
+            re.sub(pattern, '', res)
+        )
+
+        res = render_template_with_form(
+            '{% bootstrap_form form error_types="non_field_errors" %}',
+            {'form': form}
+        )
+        expected = """
+            <div class="alert alert-danger alert-dismissable alert-link">
+                <button class="close" type="button" data-dismiss="alert" aria-hidden="true">&#215;</button>
+                This error was added to show the non field errors styling.
+            </div>
+     """
+        self.assertIn(
+            re.sub(pattern, '', expected),
+            re.sub(pattern, '', res)
+        )
+        res2 = render_template_with_form(
+            '{% bootstrap_form form %}',
+            {'form': form}
+        )
+        self.assertEqual(res, res2)
+
+        res = render_template_with_form(
+            '{% bootstrap_form form error_types="field_errors" %}',
+            {'form': form}
+        )
+        expected = """
+         <div class="alert alert-danger alert-dismissable alert-link">
+            <button class="close" type="button" data-dismiss="alert" aria-hidden="true">&#215;</button>
+            Enter a valid email address.<br>
+            This field is required.
+        </div>
+     """
+        self.assertIn(
+            re.sub(pattern, '', expected),
+            re.sub(pattern, '', res)
+        )
+
 
 class FieldTest(TestCase):
     def test_illegal_field(self):
@@ -393,34 +482,63 @@ class FieldTest(TestCase):
         self.assertIn('placeholder="Password"', res)
 
     def test_required_field(self):
-        required_field = render_form_field('subject')
-        self.assertIn('required', required_field)
-        self.assertIn('bootstrap3-req', required_field)
-        not_required_field = render_form_field('message')
-        self.assertNotIn('required', not_required_field)
-        # Required field with required=0
-        form_field = 'form.subject'
-        rendered = render_template_with_form('{% bootstrap_field ' + form_field + ' set_required=0 %}')
-        self.assertNotIn('required', rendered)
+        if DBS3_SET_REQUIRED_SET_DISABLED:
+            required_field = render_form_field('subject')
+            self.assertIn('required', required_field)
+            self.assertIn('bootstrap3-req', required_field)
+            not_required_field = render_form_field('message')
+            self.assertNotIn('required', not_required_field)
+            # Required field with required=0
+            form_field = 'form.subject'
+            rendered = render_template_with_form('{% bootstrap_field ' + form_field + ' set_required=0 %}')
+            self.assertNotIn('required', rendered)
+        else:
+            required_css_class = 'bootstrap3-req'
+            required_field = render_form_field('subject')
+            self.assertIn(required_css_class, required_field)
+            not_required_field = render_form_field('message')
+            self.assertNotIn(required_css_class, not_required_field)
         # Required settings in field
         form_field = 'form.subject'
         rendered = render_template_with_form(
-            '{% bootstrap_field ' + form_field + ' required_css_class="test-required" %}')
+            '{% bootstrap_field ' + form_field + ' required_css_class="test-required" %}'
+        )
         self.assertIn('test-required', rendered)
 
     def test_empty_permitted(self):
-        form = TestForm()
-        res = render_form_field('subject', {'form': form})
-        self.assertIn('required', res)
-        form.empty_permitted = True
-        res = render_form_field('subject', {'form': form})
-        self.assertNotIn('required', res)
+        """
+        If a form has empty_permitted, no fields should get the CSS class for required.
+        Django <= 1.8, also check `required` attribute.
+        """
+        if DBS3_SET_REQUIRED_SET_DISABLED:
+            required_css_class = 'bootstrap3-req'
+            form = TestForm()
+            res = render_form_field('subject', {'form': form})
+            self.assertIn(required_css_class, res)
+            form.empty_permitted = True
+            res = render_form_field('subject', {'form': form})
+            self.assertNotIn(required_css_class, res)
+        else:
+            required_css_class = 'bootstrap3-req'
+            form = TestForm()
+            res = render_form_field('subject', {'form': form})
+            self.assertIn(required_css_class, res)
+            form.empty_permitted = True
+            res = render_form_field('subject', {'form': form})
+            self.assertNotIn(required_css_class, res)
 
     def test_input_group(self):
         res = render_template_with_form('{% bootstrap_field form.subject addon_before="$"  addon_after=".00" %}')
         self.assertIn('class="input-group"', res)
         self.assertIn('class="input-group-addon">$', res)
         self.assertIn('class="input-group-addon">.00', res)
+
+    def test_input_group_addon_button(self):
+        res = render_template_with_form(
+            '{% bootstrap_field form.subject addon_before="$" addon_before_class="input-group-btn" addon_after=".00" addon_after_class="input-group-btn" %}')  # noqa
+        self.assertIn('class="input-group"', res)
+        self.assertIn('class="input-group-btn">$', res)
+        self.assertIn('class="input-group-btn">.00', res)
 
     def test_size(self):
         def _test_size(param, klass):
@@ -452,12 +570,33 @@ class FieldTest(TestCase):
         rendered_b = render_form_field("addon", context)
         self.assertEqual(rendered_a, rendered_b)
 
+    def test_label(self):
+        res = render_template_with_form('{% bootstrap_label "foobar" label_for="subject" %}')
+        self.assertEqual('<label for="subject">foobar</label>', res)
+
     def test_attributes_consistency(self):
         form = TestForm()
         attrs = form.fields['addon'].widget.attrs.copy()
-        context = dict(form=form)
-        field_alone = render_form_field("addon", context)
         self.assertEqual(attrs, form.fields['addon'].widget.attrs)
+
+    def test_placeholder(self):
+        res = render_template_with_form('{% bootstrap_field form.sender %}')
+        self.assertIn('placeholder="Sender', res)
+
+    def test_overwrite_placeholder(self):
+        res = render_template_with_form('{% bootstrap_field form.sender placeholder="foo" %}')
+        self.assertIn('placeholder="foo', res)
+
+        # If set_placeholder is set, also consider label override for placeholder
+        res = render_template_with_form('{% bootstrap_field form.sender label="foo" %}')
+        self.assertNotIn('Sender', res)
+        self.assertIn('placeholder="foo', res)
+        self.assertIn('foo</label>', res)
+
+    def test_overwrite_label(self):
+        res = render_template_with_form('{% bootstrap_field form.sender label="foo" %}')
+        self.assertNotIn('Sender', res)
+        self.assertIn('foo', res)
 
 
 class ComponentsTest(TestCase):
@@ -610,11 +749,11 @@ class ButtonTest(TestCase):
     def test_button(self):
         res = render_template_with_form("{% bootstrap_button 'button' size='lg' %}")
         self.assertEqual(
-            res.strip(), '<button class="btn btn-lg">button</button>')
+            res.strip(), '<button class="btn btn-default btn-lg">button</button>')
         res = render_template_with_form("{% bootstrap_button 'button' size='lg' href='#' %}")
         self.assertIn(
             res.strip(),
-            '<a class="btn btn-lg" href="#">button</a><a href="#" ' +
+            '<a class="btn btn-default btn-lg" href="#">button</a><a href="#" ' +
             'class="btn btn-lg">button</a>')
 
 
@@ -642,5 +781,64 @@ class ShowLabelTest(TestCase):
         )
         self.assertEqual(
             res.strip(),
-            '<button class="btn"><span class="glyphicon glyphicon-info-sign"></span> test</button>'
+            '<button class="btn btn-default"><span class="glyphicon glyphicon-info-sign"></span> test</button>'
         )
+        res = render_template_with_form(
+            "{% bootstrap_button 'test' icon='info-sign' button_class='btn-primary' %}"
+        )
+        self.assertEqual(
+            res.strip(),
+            '<button class="btn btn-primary"><span class="glyphicon glyphicon-info-sign"></span> test</button>'
+        )
+        res = render_template_with_form(
+            "{% bootstrap_button 'test' icon='info-sign' button_type='submit' %}"
+        )
+        self.assertHTMLEqual(
+            res,
+            '<button'
+            ' class="btn btn-default"'
+            ' type="submit">'
+            '<span'
+            ' class="glyphicon glyphicon-info-sign"></span>'
+            ' test</button>'
+        )
+
+
+class ShowPlaceholderTest(TestCase):
+    def test_placeholder_set_from_label(self):
+        res = render_form_field('sender')
+        self.assertIn('placeholder="Sender © unicode"', res)
+
+
+class ShowAddonsTest(TestCase):
+    def assertFieldHasAddons(self, field):
+        """Asserts that a given field has an after and before addon."""
+        addon_before = "bf"
+        addon_after = "af"
+
+        res = render_template_with_form(
+            '{{% bootstrap_field form.{0} addon_before="{1}"  addon_after="{2}" %}}'.format(
+                field, addon_before, addon_after)
+        )
+
+        self.assertIn('class="input-group"', res)
+        self.assertIn('class="input-group-addon">{0}'.format(addon_before), res)
+        self.assertIn('class="input-group-addon">{0}'.format(addon_after), res)
+
+    def test_show_addons_textinput(self):
+        self.assertFieldHasAddons("subject")
+
+    def test_show_addons_select(self):
+        self.assertFieldHasAddons("select1")
+
+    def test_show_addons_dateinput(self):
+        self.assertFieldHasAddons("date")
+
+    def test_show_addons_email(self):
+        self.assertFieldHasAddons("sender")
+
+    def test_show_addons_number(self):
+        self.assertFieldHasAddons("number")
+
+    def test_show_addons_url(self):
+        self.assertFieldHasAddons("url")

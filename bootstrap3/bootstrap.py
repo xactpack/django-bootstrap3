@@ -1,14 +1,20 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
 
-from django.conf import settings
 from importlib import import_module
 
+from django import VERSION as DJANGO_VERSION
+from django.conf import settings
+
+# Do we support set_required and set_disabled?
+# See GitHub issues 337 and 345
+# TODO: Get rid of this after support for Django 1.8 LTS ends
+DBS3_SET_REQUIRED_SET_DISABLED = DJANGO_VERSION[0] < 2 and DJANGO_VERSION[1] < 10
 
 # Default settings
 BOOTSTRAP3_DEFAULTS = {
     'jquery_url': '//code.jquery.com/jquery.min.js',
-    'base_url': '//maxcdn.bootstrapcdn.com/bootstrap/3.3.6/',
+    'base_url': '//maxcdn.bootstrapcdn.com/bootstrap/3.3.7/',
     'css_url': None,
     'theme_url': None,
     'javascript_url': None,
@@ -16,8 +22,7 @@ BOOTSTRAP3_DEFAULTS = {
     'include_jquery': False,
     'horizontal_label_class': 'col-md-3',
     'horizontal_field_class': 'col-md-9',
-    'set_required': True,
-    'set_disabled': False,
+
     'set_placeholder': True,
     'required_css_class': '',
     'error_css_class': 'has-error',
@@ -33,6 +38,12 @@ BOOTSTRAP3_DEFAULTS = {
         'inline': 'bootstrap3.renderers.InlineFieldRenderer',
     },
 }
+
+if DBS3_SET_REQUIRED_SET_DISABLED:
+    BOOTSTRAP3_DEFAULTS.update({
+        'set_required': True,
+        'set_disabled': False,
+    })
 
 # Start with a copy of default settings
 BOOTSTRAP3 = BOOTSTRAP3_DEFAULTS.copy()
@@ -66,16 +77,16 @@ def javascript_url():
     """
     Return the full url to the Bootstrap JavaScript file
     """
-    return get_bootstrap_setting('javascript_url') or \
-        bootstrap_url('js/bootstrap.min.js')
+    url = get_bootstrap_setting('javascript_url')
+    return url if url else bootstrap_url('js/bootstrap.min.js')
 
 
 def css_url():
     """
     Return the full url to the Bootstrap CSS file
     """
-    return get_bootstrap_setting('css_url') or \
-        bootstrap_url('css/bootstrap.min.css')
+    url = get_bootstrap_setting('css_url')
+    return url if url else bootstrap_url('css/bootstrap.min.css')
 
 
 def theme_url():
