@@ -127,7 +127,7 @@ class FormsetRenderer(BaseRenderer):
         return '\n'.join(rendered_forms)
 
     def get_formset_errors(self):
-        return self.formset.non_form_errors()
+        return self.formset.errors
 
     def render_errors(self):
         formset_errors = self.get_formset_errors()
